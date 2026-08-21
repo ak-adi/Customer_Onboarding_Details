@@ -14,15 +14,7 @@ function statusBadge(status) {
   return <span className={`badge ${cls}`}>{status}</span>;
 }
 
-function roleBadge(role) {
-  const r = (role || 'general').toLowerCase();
-  const cls = r === 'cms' ? 'badge-role-cms'
-            : r === 'colorplast' ? 'badge-role-colorplast'
-            : 'badge-role-admin';
-  return <span className={cls}>{r.toUpperCase()}</span>;
-}
-
-export default function AdminView() {
+export default function CmsDashboard() {
   const [records, setRecords] = useState([]);
   const [schema, setSchema] = useState([]);
   const [atrAts, setAtrAts] = useState([]);
@@ -34,23 +26,15 @@ export default function AdminView() {
   const [editRecord, setEditRecord] = useState(null);
 
   const navigate = useNavigate();
-  const token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token');
+  const userName = localStorage.getItem('auth_user') || 'CMS User';
 
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/api/records`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(`${API}/api/records?role=cms`);
       setRecords(res.data);
     } catch (err) {
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('auth_token');
-        navigate('/login');
-      } else {
-        showToast('Failed to fetch records', 'error');
-      }
+      showToast('Failed to load records from server', 'error');
     } finally {
       setLoading(false);
     }
@@ -82,27 +66,12 @@ export default function AdminView() {
     fetchRecords();
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
-    try {
-      await axios.delete(`${API}/api/records/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setRecords(r => r.filter(x => x.id !== id));
-      showToast('✅ Record deleted successfully');
-    } catch {
-      showToast('Delete failed', 'error');
-    }
-  };
-
   const handleExport = async () => {
     setExporting(true);
     try {
-      const res = await axios.get(`${API}/api/export`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'arraybuffer',
+      const res = await axios.get(`${API}/api/export?role=cms`, {
+        responseType: 'arraybuffer'
       });
-
       const blob = new Blob([res.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
@@ -110,12 +79,12 @@ export default function AdminView() {
       const link = document.createElement('a');
       const today = new Date().toISOString().slice(0, 10);
       link.href = url;
-      link.setAttribute('download', `Master_Customer_Onboarding_${today}.xlsx`);
+      link.setAttribute('download', `CMS_Customer_Submissions_${today}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      showToast('📥 Master Excel report downloaded!');
+      showToast('📥 CMS Excel report downloaded!');
     } catch (err) {
       showToast('Export failed', 'error');
     } finally {
@@ -124,10 +93,10 @@ export default function AdminView() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_role');
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_name');
     navigate('/login');
   };
 
@@ -142,21 +111,20 @@ export default function AdminView() {
 
   const cols = [
     { key: 'id', label: 'ID' },
-    { key: 'role_id', label: 'Role / Portal' },
     { key: 'sr_no', label: 'Sr. No.' },
     { key: 'po_no', label: 'PO No.' },
     { key: 'product_description', label: 'Product Description' },
     { key: 'po_date', label: 'PO Date' },
     { key: 'card_quantity', label: 'Card Qty' },
-    { key: 'antenna_type', label: 'Antenna Type' },
+    { key: 'antenna_type', label: 'Antenna' },
     { key: 'perso_type', label: 'Perso Type' },
     { key: 'module_make', label: 'Module Make' },
     { key: 'module_part_code', label: 'Part Code' },
     { key: 'chip_atr', label: 'Chip ATR' },
     { key: 'chip_ats', label: 'Chip ATS' },
-    { key: 'module_qty_sent', label: 'Mod. Qty Sent' },
+    { key: 'module_qty_sent', label: 'Mod Qty' },
     { key: 'module_sent_date', label: 'Sent Date' },
-    { key: 'module_received_date', label: 'Received Date' },
+    { key: 'module_received_date', label: 'Recv Date' },
     { key: 'cdd', label: 'CDD' },
     { key: 'order_status', label: 'Status' },
     { key: 'submitted_at', label: 'Submitted At' },
@@ -165,21 +133,29 @@ export default function AdminView() {
   return (
     <div className="page-wrapper">
       {/* Navbar */}
-      <nav className="navbar">
-        <a href="/" className="navbar-brand">
-          <img src="/colorplast_exe_icon.png" alt="Colorplast Logo" className="brand-logo" />
-          <div>
-            <div>Customer Onboarding System</div>
-            <div className="navbar-title">Super Admin Control Panel</div>
+      <nav className="navbar" style={{ borderBottom: '2px solid #0d9488' }}>
+        <div className="navbar-brand">
+          <div style={{
+            width: 36, height: 36, borderRadius: 8,
+            background: 'linear-gradient(135deg, #0f766e, #0d9488)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '18px', color: '#fff', boxShadow: '0 2px 8px rgba(13,148,136,0.3)'
+          }}>
+            💼
           </div>
-        </a>
+          <div>
+            <div style={{ color: '#0f766e', fontWeight: 800 }}>CMS Customer Portal</div>
+            <div className="navbar-title">Order Processing &amp; Tracking Dashboard</div>
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span className="badge-role-admin">
-            👑 Administrator
+          <span className="badge-role-cms">
+            👤 {userName} (CMS Role)
           </span>
           <button
             className="btn btn-ghost"
-            style={{ fontSize: '0.8rem', padding: '8px 16px' }}
+            style={{ fontSize: '0.8rem', padding: '7px 14px' }}
             onClick={handleLogout}
           >
             🚪 Logout
@@ -188,18 +164,18 @@ export default function AdminView() {
       </nav>
 
       {/* Page Header */}
-      <div className="page-header">
-        <h1>Super Admin Dashboard</h1>
-        <p>Master overview and management for all CMS and Colorplast onboarding records</p>
+      <div className="page-header" style={{ padding: '32px 20px 24px' }}>
+        <h1 style={{ color: '#0f766e' }}>CMS Operations Dashboard</h1>
+        <p>Manage customer onboarding details, record new POs, and update existing tracking records.</p>
       </div>
 
       <div style={{ maxWidth: 1480, margin: '0 auto', padding: '0 20px' }}>
         {/* Stats Row */}
         <div className="stats-row">
           <div className="stat-card">
-            <div className="stat-icon">📋</div>
+            <div className="stat-icon" style={{ background: 'rgba(13,148,136,0.12)', color: '#0f766e' }}>📋</div>
             <div className="stat-value">{total}</div>
-            <div className="stat-label">Total Submissions</div>
+            <div className="stat-label">Total CMS Records</div>
           </div>
           <div className="stat-card">
             <div className="stat-icon" style={{ background: 'var(--danger-bg)' }}>⚙️</div>
@@ -220,35 +196,46 @@ export default function AdminView() {
 
         {/* Toolbar */}
         <div className="toolbar">
-          <input
-            type="text"
-            className="form-input"
-            style={{ maxWidth: 340 }}
-            placeholder="🔍 Search across all records..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            id="admin-search"
-          />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, maxWidth: 440 }}>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="🔍 Search PO, customer, chip, status..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              id="cms-search"
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
-              id="admin-new-entry-btn"
+              id="cms-new-entry-btn"
               className="btn btn-primary"
-              style={{ fontSize: '0.86rem', fontWeight: 700 }}
+              style={{
+                background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+                borderColor: '#0f766e',
+                fontSize: '0.86rem',
+                fontWeight: 700
+              }}
               onClick={handleOpenNew}
             >
               ➕ New Entry
             </button>
+
             <button
-              id="export-excel-btn"
+              id="cms-export-btn"
               className="btn btn-success"
               style={{ fontSize: '0.82rem' }}
               onClick={handleExport}
               disabled={exporting}
             >
-              {exporting
-                ? <><div className="spinner" style={{ borderTopColor: 'var(--success)' }}></div> Exporting...</>
-                : '📥 Export Excel'}
+              {exporting ? (
+                <><div className="spinner" style={{ borderTopColor: 'var(--success)' }}></div> Exporting...</>
+              ) : (
+                '📥 Export Excel'
+              )}
             </button>
+
             <button
               className="btn btn-ghost"
               style={{ fontSize: '0.82rem' }}
@@ -260,7 +247,7 @@ export default function AdminView() {
           </div>
         </div>
 
-        {/* Table Card */}
+        {/* Data Table Card */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: 64, color: 'var(--text-muted)' }}>
@@ -269,16 +256,16 @@ export default function AdminView() {
                 width: 30, height: 30,
                 borderWidth: 3,
                 borderColor: 'var(--border)',
-                borderTopColor: 'var(--accent)'
+                borderTopColor: '#0f766e'
               }}></div>
-              Loading records...
+              Loading CMS records...
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 64, color: 'var(--text-muted)' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📭</div>
-              <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No records found</div>
+              <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No entries found</div>
               <div style={{ fontSize: '0.83rem', marginTop: 4 }}>
-                {search ? 'Try a different search term' : 'No records have been submitted yet'}
+                {search ? 'Try adjusting your search criteria' : 'Click "+ New Entry" above to add your first customer order'}
               </div>
             </div>
           ) : (
@@ -302,25 +289,15 @@ export default function AdminView() {
                           >
                             ✏️ Edit
                           </button>
-                          <button
-                            className="btn btn-danger"
-                            style={{ padding: '5px 10px', fontSize: '0.75rem' }}
-                            onClick={() => handleDelete(row.id)}
-                            title="Delete this record"
-                          >
-                            🗑️ Delete
-                          </button>
                         </div>
                       </td>
                       {cols.map(c => (
                         <td key={c.key}>
-                          {c.key === 'role_id'
-                            ? roleBadge(row[c.key])
-                            : c.key === 'order_status'
-                              ? statusBadge(row[c.key])
-                              : c.key === 'submitted_at'
-                                ? (row[c.key] ? new Date(row[c.key]).toLocaleString() : '—')
-                                : (row[c.key] || <span style={{ color: 'var(--text-muted)' }}>—</span>)
+                          {c.key === 'order_status'
+                            ? statusBadge(row[c.key])
+                            : c.key === 'submitted_at'
+                              ? (row[c.key] ? new Date(row[c.key]).toLocaleString() : '—')
+                              : (row[c.key] || <span style={{ color: 'var(--text-muted)' }}>—</span>)
                           }
                         </td>
                       ))}
@@ -332,9 +309,9 @@ export default function AdminView() {
           )}
         </div>
 
-        {/* Footer count */}
+        {/* Footer info */}
         <div style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 500 }}>
-          Showing <strong style={{ color: 'var(--accent-dark)' }}>{filtered.length}</strong> of <strong style={{ color: 'var(--accent-dark)' }}>{total}</strong> records
+          Showing <strong style={{ color: '#0f766e' }}>{filtered.length}</strong> of <strong style={{ color: '#0f766e' }}>{total}</strong> CMS entries
           {search && ` • Filtered by "${search}"`}
         </div>
       </div>
@@ -345,13 +322,17 @@ export default function AdminView() {
         onClose={() => setModalOpen(false)}
         onSuccess={handleModalSuccess}
         initialData={editRecord}
-        role="admin"
+        role="cms"
         schema={schema}
         atrAts={atrAts}
       />
 
       {/* Toast */}
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }

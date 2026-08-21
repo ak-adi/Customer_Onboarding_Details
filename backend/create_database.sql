@@ -38,12 +38,20 @@ BEGIN
         module_received_date NVARCHAR(50)   NULL,
         cdd                 NVARCHAR(50)    NULL,
         order_status        NVARCHAR(100)   NULL,
-        submitted_at        DATETIME        DEFAULT GETDATE()
+        role_id             NVARCHAR(50)    DEFAULT 'general',
+        submitted_at        DATETIME        DEFAULT GETDATE(),
+        updated_at          DATETIME        NULL
     );
     PRINT 'Table POSubmissions created successfully.';
 END
 ELSE
-    PRINT 'Table POSubmissions already exists.';
+BEGIN
+    PRINT 'Table POSubmissions already exists. Ensuring columns exist...';
+    IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('POSubmissions') AND name='role_id')
+        ALTER TABLE POSubmissions ADD role_id NVARCHAR(50) DEFAULT 'general';
+    IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('POSubmissions') AND name='updated_at')
+        ALTER TABLE POSubmissions ADD updated_at DATETIME NULL;
+END
 GO
 
 PRINT 'Processing_Dashboard setup complete!';

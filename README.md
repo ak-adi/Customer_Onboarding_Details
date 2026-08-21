@@ -1,14 +1,25 @@
 # Customer Onboarding & Processing Details Application
 
-A modern, full-stack web application for Customer Onboarding & Processing Details with dynamic module configuration, processing steps tracking, interactive reports, and an administrative control panel.
+A modern, full-stack web application for Customer Onboarding & Processing Details with dynamic module configuration, dual role-based dashboards (CMS & Colorplast), administrative control panel, and Microsoft SQL Server persistence.
 
 ## Features
 
-- **Dynamic Interactive Dashboard**: Live search, filtering by Customer Code, Application, Module Make, ATR/ATS details, and status.
-- **Admin Management Panel**: Secure JWT-based admin login, dynamic master record management (Customer Master, Process Flow, Module Parameters, etc.).
-- **Excel & Data Synchronization**: Batch imports, exports, and schema configurations.
-- **Modern UI/UX**: Dark-mode inspired premium theme, responsive design, fast search, modal dialogs, and real-time state updates.
-- **Full-Stack Architecture**: React + Vite on the frontend, Node.js + Express + SQL Server on the backend.
+- **Dual Dedicated Dashboards**:
+  - **CMS Operations Dashboard** (`/cms/dashboard`): Tailored for CMS partner order entries and tracking.
+  - **Colorplast Operations Dashboard** (`/colorplast/dashboard`): Dedicated internal processing and module configuration portal.
+- **Role-Based Authentication**: Secure role tokens for `cms`, `colorplast`, and `admin` with quick test login shortcuts.
+- **New Entry & Edit Capabilities**: Modal dialogs allowing users to create new customer onboarding entries or edit existing records in real-time.
+- **Automated Parameter Lookup**: Module Make selection automatically resolves Chip ATR and ATS hex values.
+- **Excel & Data Synchronization**: Role-based and master Excel exports (`.xlsx`).
+- **Comprehensive Documentation**: Complete architecture and workflow manual available in [`CMS_COLORPLAST_SYSTEM_GUIDE.md`](./CMS_COLORPLAST_SYSTEM_GUIDE.md).
+
+## Quick Default Credentials for Testing
+
+| Role | Username | Password | Dashboard |
+| :--- | :--- | :--- | :--- |
+| **CMS Portal** | `cms` | `cms@123` | `/cms/dashboard` |
+| **Colorplast Portal** | `colorplast` | `color@123` | `/colorplast/dashboard` |
+| **Super Admin** | `admin` | `admin@123` | `/admin` |
 
 ## Project Structure
 

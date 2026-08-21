@@ -79,26 +79,37 @@ async function initDb() {
     mssqlPool = await sql.connect(dbConfig);
     await mssqlPool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='POSubmissions' AND xtype='U')
-      CREATE TABLE POSubmissions (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        sr_no NVARCHAR(50),
-        po_no NVARCHAR(100),
-        product_description NVARCHAR(500),
-        po_date NVARCHAR(50),
-        card_quantity NVARCHAR(100),
-        antenna_type NVARCHAR(100),
-        perso_type NVARCHAR(100),
-        module_make NVARCHAR(200),
-        module_part_code NVARCHAR(200),
-        chip_atr NVARCHAR(200),
-        chip_ats NVARCHAR(200),
-        module_qty_sent NVARCHAR(100),
-        module_sent_date NVARCHAR(50),
-        module_received_date NVARCHAR(50),
-        cdd NVARCHAR(50),
-        order_status NVARCHAR(100),
-        submitted_at DATETIME DEFAULT GETDATE()
-      )
+      BEGIN
+        CREATE TABLE POSubmissions (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          sr_no NVARCHAR(50),
+          po_no NVARCHAR(100),
+          product_description NVARCHAR(500),
+          po_date NVARCHAR(50),
+          card_quantity NVARCHAR(100),
+          antenna_type NVARCHAR(100),
+          perso_type NVARCHAR(100),
+          module_make NVARCHAR(200),
+          module_part_code NVARCHAR(200),
+          chip_atr NVARCHAR(200),
+          chip_ats NVARCHAR(200),
+          module_qty_sent NVARCHAR(100),
+          module_sent_date NVARCHAR(50),
+          module_received_date NVARCHAR(50),
+          cdd NVARCHAR(50),
+          order_status NVARCHAR(100),
+          role_id NVARCHAR(50) DEFAULT 'general',
+          submitted_at DATETIME DEFAULT GETDATE(),
+          updated_at DATETIME NULL
+        );
+      END
+      ELSE
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('POSubmissions') AND name='role_id')
+          ALTER TABLE POSubmissions ADD role_id NVARCHAR(50) DEFAULT 'general';
+        IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('POSubmissions') AND name='updated_at')
+          ALTER TABLE POSubmissions ADD updated_at DATETIME NULL;
+      END
     `);
     console.log("Connected to SSMS LocalDB successfully!");
   } catch (err) {
@@ -111,7 +122,7 @@ initDb();
 // ─── Database Operations ───────────────────────────────────────────────
 async function insertSubmission(d) {
   if (!mssqlPool) throw new Error("Database not connected");
-  await mssqlPool.request()
+  const result = await mssqlPool.request()
     .input("sr_no", sql.NVarChar, d.sr_no || "")
     .input("po_no", sql.NVarChar, d.po_no || "")
     .input("product_description", sql.NVarChar, d.product_description || "")
@@ -127,23 +138,86 @@ async function insertSubmission(d) {
     .input("module_sent_date", sql.NVarChar, d.module_sent_date || "")
     .input("module_received_date", sql.NVarChar, d.module_received_date || "")
     .input("cdd", sql.NVarChar, d.cdd || "")
-    .input("order_status", sql.NVarChar, d.order_status || "")
+    .input("order_status", sql.NVarChar, d.order_status || "In Process")
+    .input("role_id", sql.NVarChar, d.role_id || "general")
     .query(`
       INSERT INTO POSubmissions
         (sr_no,po_no,product_description,po_date,card_quantity,antenna_type,perso_type,
          module_make,module_part_code,chip_atr,chip_ats,module_qty_sent,module_sent_date,
-         module_received_date,cdd,order_status)
+         module_received_date,cdd,order_status,role_id)
+      OUTPUT INSERTED.id
       VALUES
         (@sr_no,@po_no,@product_description,@po_date,@card_quantity,@antenna_type,@perso_type,
          @module_make,@module_part_code,@chip_atr,@chip_ats,@module_qty_sent,@module_sent_date,
-         @module_received_date,@cdd,@order_status)
+         @module_received_date,@cdd,@order_status,@role_id)
+    `);
+  return result.recordset[0]?.id;
+}
+
+async function updateSubmission(id, d) {
+  if (!mssqlPool) throw new Error("Database not connected");
+  await mssqlPool.request()
+    .input("id", sql.Int, id)
+    .input("sr_no", sql.NVarChar, d.sr_no || "")
+    .input("po_no", sql.NVarChar, d.po_no || "")
+    .input("product_description", sql.NVarChar, d.product_description || "")
+    .input("po_date", sql.NVarChar, d.po_date || "")
+    .input("card_quantity", sql.NVarChar, String(d.card_quantity || ""))
+    .input("antenna_type", sql.NVarChar, d.antenna_type || "")
+    .input("perso_type", sql.NVarChar, d.perso_type || "")
+    .input("module_make", sql.NVarChar, d.module_make || "")
+    .input("module_part_code", sql.NVarChar, d.module_part_code || "")
+    .input("chip_atr", sql.NVarChar, d.chip_atr || "")
+    .input("chip_ats", sql.NVarChar, d.chip_ats || "")
+    .input("module_qty_sent", sql.NVarChar, String(d.module_qty_sent || ""))
+    .input("module_sent_date", sql.NVarChar, d.module_sent_date || "")
+    .input("module_received_date", sql.NVarChar, d.module_received_date || "")
+    .input("cdd", sql.NVarChar, d.cdd || "")
+    .input("order_status", sql.NVarChar, d.order_status || "In Process")
+    .input("role_id", sql.NVarChar, d.role_id || null)
+    .query(`
+      UPDATE POSubmissions
+      SET
+        sr_no = @sr_no,
+        po_no = @po_no,
+        product_description = @product_description,
+        po_date = @po_date,
+        card_quantity = @card_quantity,
+        antenna_type = @antenna_type,
+        perso_type = @perso_type,
+        module_make = @module_make,
+        module_part_code = @module_part_code,
+        chip_atr = @chip_atr,
+        chip_ats = @chip_ats,
+        module_qty_sent = @module_qty_sent,
+        module_sent_date = @module_sent_date,
+        module_received_date = @module_received_date,
+        cdd = @cdd,
+        order_status = @order_status,
+        role_id = COALESCE(@role_id, role_id),
+        updated_at = GETDATE()
+      WHERE id = @id
     `);
 }
 
-async function getAllSubmissions() {
+async function getAllSubmissions(role = null) {
   if (!mssqlPool) throw new Error("Database not connected");
+  if (role && role !== "all") {
+    const res = await mssqlPool.request()
+      .input("role_id", sql.NVarChar, role)
+      .query("SELECT * FROM POSubmissions WHERE role_id = @role_id OR role_id = 'general' OR role_id IS NULL ORDER BY submitted_at DESC");
+    return res.recordset;
+  }
   const result = await mssqlPool.request().query("SELECT * FROM POSubmissions ORDER BY submitted_at DESC");
   return result.recordset;
+}
+
+async function getSubmissionById(id) {
+  if (!mssqlPool) throw new Error("Database not connected");
+  const result = await mssqlPool.request()
+    .input("id", sql.Int, id)
+    .query("SELECT * FROM POSubmissions WHERE id = @id");
+  return result.recordset[0] || null;
 }
 
 async function deleteSubmission(id) {
@@ -154,13 +228,26 @@ async function deleteSubmission(id) {
 }
 
 // ─── Auth Middleware ─────────────────────────────────────────────────
+function authRequired(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) return res.status(401).json({ error: "Authentication token required" });
+  const token = authHeader.split(" ")[1];
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET || "ProcDashSecret2026!");
+    req.user = payload;
+    next();
+  } catch (e) {
+    return res.status(403).json({ error: "Invalid or expired token" });
+  }
+}
+
 function adminAuth(req, res, next) {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.status(401).json({ error: "No token provided" });
   const token = authHeader.split(" ")[1];
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || "ProcDashSecret2026!");
-    if (payload.role !== "admin") return res.status(403).json({ error: "Forbidden" });
+    if (payload.role !== "admin") return res.status(403).json({ error: "Admin authorization required" });
     req.user = payload;
     next();
   } catch (e) {
@@ -215,29 +302,102 @@ app.get("/api/schema", (req, res) => {
   ]);
 });
 
-// POST /api/submit
+// POST /api/auth/login - Supports CMS, Colorplast, and Admin roles
+app.post("/api/auth/login", (req, res) => {
+  const { username, password, role: requestedRole } = req.body;
+  const jwtSecret = process.env.JWT_SECRET || "ProcDashSecret2026!";
+
+  const users = [
+    {
+      username: process.env.CMS_USER || "cms",
+      password: process.env.CMS_PASS || "cms@123",
+      role: "cms",
+      roleName: "CMS Portal"
+    },
+    {
+      username: process.env.COLORPLAST_USER || "colorplast",
+      password: process.env.COLORPLAST_PASS || "color@123",
+      role: "colorplast",
+      roleName: "Colorplast Portal"
+    },
+    {
+      username: process.env.ADMIN_USER || "admin",
+      password: process.env.ADMIN_PASS || "admin@123",
+      role: "admin",
+      roleName: "Super Admin"
+    }
+  ];
+
+  const user = users.find(u =>
+    u.username.toLowerCase() === (username || "").toLowerCase() &&
+    u.password === password &&
+    (!requestedRole || requestedRole === "any" || u.role === requestedRole)
+  );
+
+  if (user) {
+    const token = jwt.sign(
+      { role: user.role, username: user.username, roleName: user.roleName },
+      jwtSecret,
+      { expiresIn: "12h" }
+    );
+    return res.json({
+      token,
+      role: user.role,
+      username: user.username,
+      roleName: user.roleName
+    });
+  }
+
+  res.status(401).json({ error: "Invalid username or password for this role." });
+});
+
+// GET /api/records - Get all records or role-filtered records
+app.get("/api/records", async (req, res) => {
+  try {
+    const role = req.query.role || null;
+    const records = await getAllSubmissions(role);
+    res.json(records);
+  } catch (err) {
+    console.error("Fetch error:", err.message);
+    res.status(500).json({ error: "Database error: " + err.message });
+  }
+});
+
+// GET /api/records/:id - Get single record
+app.get("/api/records/:id", async (req, res) => {
+  try {
+    const record = await getSubmissionById(req.params.id);
+    if (!record) return res.status(404).json({ error: "Record not found" });
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ error: "Database error: " + err.message });
+  }
+});
+
+// POST /api/submit - Create new entry
 app.post("/api/submit", async (req, res) => {
   try {
-    await insertSubmission(req.body);
-    res.json({ success: true, message: "Customer Onboarding entry saved successfully!" });
+    const newId = await insertSubmission(req.body);
+    res.json({ success: true, id: newId, message: "Customer Onboarding entry saved successfully!" });
   } catch (err) {
     console.error("Insert error:", err.message);
     res.status(500).json({ error: "Database error: " + err.message });
   }
 });
 
-// POST /api/auth/login
-app.post("/api/auth/login", (req, res) => {
-  const { username, password } = req.body;
-  const adminUser = process.env.ADMIN_USER || "admin";
-  const adminPass = process.env.ADMIN_PASS || "admin@123";
-  const jwtSecret = process.env.JWT_SECRET || "ProcDashSecret2026!";
-
-  if (username === adminUser && password === adminPass) {
-    const token = jwt.sign({ role: "admin", username }, jwtSecret, { expiresIn: "8h" });
-    res.json({ token });
-  } else {
-    res.status(401).json({ error: "Invalid credentials" });
+// PUT /api/records/:id - Update existing entry
+app.put("/api/records/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const existing = await getSubmissionById(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Record not found" });
+    }
+    await updateSubmission(id, req.body);
+    res.json({ success: true, message: "Record updated successfully!" });
+  } catch (err) {
+    console.error("Update error:", err.message);
+    res.status(500).json({ error: "Database update error: " + err.message });
   }
 });
 
@@ -252,21 +412,24 @@ app.get("/api/admin/records", adminAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/admin/records/:id
-app.delete("/api/admin/records/:id", adminAuth, async (req, res) => {
+// DELETE /api/records/:id & /api/admin/records/:id
+app.delete(["/api/records/:id", "/api/admin/records/:id"], async (req, res) => {
   try {
     await deleteSubmission(req.params.id);
-    res.json({ success: true });
+    res.json({ success: true, message: "Record deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: "Database error: " + err.message });
   }
 });
 
-// GET /api/admin/export - Export to Excel
-app.get("/api/admin/export", adminAuth, async (req, res) => {
+// GET /api/export & /api/admin/export - Export to Excel
+app.get(["/api/export", "/api/admin/export"], async (req, res) => {
   try {
-    const records = await getAllSubmissions();
+    const role = req.query.role || null;
+    const records = await getAllSubmissions(role);
     const worksheetData = records.map(r => ({
+      "ID": r.id,
+      "Role": (r.role_id || "general").toUpperCase(),
       "Sr. No.": r.sr_no || "",
       "PO No.": r.po_no || "",
       "Product Description": r.product_description || "",
@@ -283,7 +446,8 @@ app.get("/api/admin/export", adminAuth, async (req, res) => {
       "Module Received Date": r.module_received_date || "",
       "CDD": r.cdd || "",
       "Order Status": r.order_status || "",
-      "Submitted At": r.submitted_at ? new Date(r.submitted_at).toLocaleString() : ""
+      "Submitted At": r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "",
+      "Updated At": r.updated_at ? new Date(r.updated_at).toLocaleString() : ""
     }));
 
     const wb = xlsx.utils.book_new();
@@ -294,10 +458,11 @@ app.get("/api/admin/export", adminAuth, async (req, res) => {
     }));
     ws['!cols'] = colWidths;
 
-    xlsx.utils.book_append_sheet(wb, ws, "Customer Submissions");
+    const sheetTitle = role ? `${role.toUpperCase()}_Records` : "Customer_Submissions";
+    xlsx.utils.book_append_sheet(wb, ws, sheetTitle);
 
     const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
-    const filename = `Customer_Onboarding_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `${sheetTitle}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Length", buf.length);
