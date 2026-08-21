@@ -1,0 +1,10 @@
+{
+  "name": "customer-onboarding-details",
+  "version": "1.0.0",
+  "description": "Customer Onboarding Details Full Stack Application",
+  "scripts": {
+    "start": "start_all.bat",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev"
+  }
+}
